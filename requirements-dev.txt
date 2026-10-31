@@ -1,0 +1,4 @@
+-r requirements.txt
+pytest>=8.0
+# ファームウェアのホストテスト・シミュレータ用 C++ コンパイラ (g++/clang++ があれば不要)
+ziglang>=0.13
