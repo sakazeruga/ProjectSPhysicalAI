@@ -5,6 +5,7 @@ Physical AI 制御基盤 エントリポイント。
     python main.py --serial-port COM5                # ポート指定
     python main.py --input sim --output log          # 実機・エージェントなしで動作確認
     python main.py --log-level DEBUG                 # 入出力フレームを全件表示
+    python main.py --input care --output mujoco      # 文字入力で MuJoCo 上のタッチケアを動かす
 """
 from __future__ import annotations
 
@@ -98,18 +99,34 @@ async def telemetry_loop(mapper: StateMapper, output: ActuatorOutput, ctl: Contr
 def build_input(args) -> InputSource:
     if args.input == "sim":
         return SimulatedInputHandler(seed=args.seed)
+    if args.input == "care":
+        from care_agent import CareAgentInput, CarePolicy, CareSession, EmotionEstimator
+
+        return CareAgentInput(CareSession(CarePolicy(EmotionEstimator())))
     return WebSocketInputHandler(args.host, args.port)
 
 
 def build_output(args) -> ActuatorOutput:
     if args.output == "log":
         return LoggingOutput()
+    if args.output == "mujoco":
+        from sim.mujoco_output import MujocoOutput
+
+        return MujocoOutput(viewer=not args.no_viewer)
     return SerialController(SerialConfig(port=args.serial_port, baudrate=args.baud))
+
+
+def build_mapper(args) -> StateMapper:
+    if args.input == "care":
+        from care_agent import care_mapper_config
+
+        return StateMapper(care_mapper_config())
+    return StateMapper(MapperConfig())
 
 
 async def run(args) -> None:
     inbox = AffectInbox()
-    mapper = StateMapper(MapperConfig())
+    mapper = build_mapper(args)
     source = build_input(args)
     output = build_output(args)
     ctl = ControlState()
@@ -130,10 +147,11 @@ async def run(args) -> None:
 
 def parse_args(argv=None):
     p = argparse.ArgumentParser(description="Affective state -> haptics bridge")
-    p.add_argument("--input", choices=["ws", "sim"], default="ws")
+    p.add_argument("--input", choices=["ws", "sim", "care"], default="ws")
     p.add_argument("--host", default="127.0.0.1")
     p.add_argument("--port", type=int, default=8765)
-    p.add_argument("--output", choices=["serial", "log"], default="serial")
+    p.add_argument("--output", choices=["serial", "log", "mujoco"], default="serial")
+    p.add_argument("--no-viewer", action="store_true", help="run --output mujoco without a window")
     p.add_argument("--serial-port", default="auto", help="COMx / /dev/ttyUSBx or 'auto'")
     p.add_argument("--baud", type=int, default=115200)
     p.add_argument("--rate", type=float, default=100.0, help="control loop rate [Hz]")

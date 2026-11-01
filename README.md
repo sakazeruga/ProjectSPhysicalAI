@@ -1,7 +1,67 @@
 # ProjectS Physical AI — Affective State → Haptics Bridge
 
 AIエージェントの感情パラメータ (arousal / valence / event_trigger) を受信し、
-ハプティクスデバイス (ESP32 等) の制御値へリアルタイム変換して送信する制御基盤。
+ハプティクスデバイス (ESP32 等) の制御値へリアルタイム変換して送信する制御基盤と、
+その上に作ったタッチケアロボットのシミュレーション。
+
+## タッチケアロボット
+
+相手の言葉から AI が感情を推定し、MuJoCo 上の Franka Panda が前腕をなでる触れ方を変える。
+
+```
+相手の発話 ─▶ 日本語BERT ─▶ 8感情 ─▶ 円環モデル ─▶ 応答感情 ─▶ StateMapper ─▶ 力制御 ─▶ 接触
+                                     (相手の感情)  (ロボットの感情)  (位置/速度/振動)
+```
+
+| 相手の状態 | ロボットの振る舞い | モード |
+|---|---|---|
+| 怒り・恐れ (不快 × 高覚醒) | 同調せず、ゆっくり長くなだめる | CALM |
+| 悲しみ (不快 × 低覚醒) | 手を止めて寄り添い、心拍状の振動を送る | GLOOMY + heartbeat |
+| 喜び (快 × 高覚醒) | 軽やかに短くなでて一緒に喜ぶ | EXCITED |
+| 安らぎ (快 × 低覚醒) | ゆっくりなでる | CALM |
+| 中立 | そっと触れて見守る | NEUTRAL |
+
+なでる速度は、心地よいタッチに反応する C 触覚線維の至適帯 (1〜10cm/s) の上限を超えないよう
+`care_mapper_config()` と接触制御の両方で制限している。
+
+安全機構は 3 層あり、下の層ほど上の層に依存しない:
+
+1. **語彙照合** (`care_agent.safety_event`): 「やめて」「痛い」等は確率モデルの推論に頼らず停止する
+2. **反射離脱** (`sim/touch_care.py`): 接触力が急上昇したら指令を待たずに離れる
+3. **ウォッチドッグ**: 指令が 300ms 途絶えたら離れる (ESP32 ファームウェアと同じ動作)
+
+| ファイル | 役割 |
+|---|---|
+| `care_agent.py` | 感情推定、感情 → 応答の変換、安全語彙、対話セッション |
+| `sim/touch_care.py` | 物理シミュレーションと力制御 (カルテシアン・インピーダンス + アドミタンス) |
+| `sim/mujoco_output.py` | `ActuatorOutput` の MuJoCo 実装 |
+| `sim/scenario.py` | 台本の通し実行と評価値の計算 |
+| `sim/model/` | シーンとロボットモデル (Franka Panda は MuJoCo Menagerie 由来, `NOTICE.md`) |
+| `tools/make_demo_video.py` | デモ動画の生成 |
+
+```bash
+.venv/Scripts/python -m pip install -r requirements-sim.txt
+```
+
+文字を入力して動かす (1 行ごとに発話として扱う。「やめて」で停止、「続けて」で再開):
+
+```bash
+.venv/Scripts/python main.py --input care --output mujoco
+```
+
+デモ動画と評価値の生成 (`outputs/` に出力):
+
+```bash
+.venv/Scripts/python tools/make_demo_video.py
+```
+
+感情推定には [patrickramos/bert-base-japanese-v2-wrime-fine-tune](https://huggingface.co/patrickramos/bert-base-japanese-v2-wrime-fine-tune)
+(CC BY-SA 3.0) を使う。重みは初回実行時に Hugging Face から取得し、リポジトリには含めない。
+
+実機では動かしていない。パッドの摩擦、肌の柔らかさ、人物の動きはシミュレーション上のモデルであり、
+実際の人に触れる用途には別途の安全検証が必要。
+
+## 制御基盤
 
 ```
 InputSource ──▶ AffectInbox ──▶ StateMapper ──▶ ActuatorOutput
@@ -54,6 +114,8 @@ python -m venv .venv
 | `tests/test_state_mapper.py` | モード判定・ヒステリシス・滞在時間・PWM・イベント・ラッチ停止・入力途絶・**出力位置の変化が申告速度とデバイス最大速度を超えないこと** |
 | `tests/test_serial_controller.py` | フレーム形式・チェックサム・ループバック送信・ポート不在時の再試行・keepalive |
 | `tests/test_firmware_sim.py` | 実ファームをシミュレータで動かすエンドツーエンド試験 (下記) |
+| `tests/test_care_agent.py` | 感情の円環配置・応答の選択・安全語彙・速度帯 |
+| `tests/test_touch_care.py` | MuJoCo 上の接触力追従・速度制限・停止・ウォッチドッグ・反射離脱・通し実行 |
 
 ### 実機なしでの結合動作 (ファームウェアシミュレータ)
 
@@ -161,5 +223,6 @@ Arduino 非依存部 (パーサ・軌道生成) はホスト PC でテストで�
 ## シミュレータへの差し替え
 
 `ActuatorOutput` (start / submit / stop / is_connected) を実装したクラスを作り、
-`main.build_output()` に分岐を足すだけで Gazebo / ROS 2 ブリッジ等へ出力先を切り替えられる。
+`main.build_output()` に分岐を足すだけで出力先を切り替えられる。`sim/mujoco_output.py` がその実例で、
+Gazebo / ROS 2 ブリッジ等も同じ形で追加できる。
 `StateMapper` は I/O を持たない純粋な計算器なので、単体テストやオフライン再生にもそのまま使える。

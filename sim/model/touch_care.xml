@@ -1,0 +1,82 @@
+<mujoco model="touch care">
+  <include file="panda_care.xml"/>
+
+  <option timestep="0.002" integrator="implicitfast"/>
+  <size memory="20M"/>
+
+  <visual>
+    <headlight diffuse="0.45 0.45 0.45" ambient="0.35 0.35 0.35" specular="0 0 0"/>
+    <global azimuth="90" elevation="-14" offwidth="1920" offheight="1080"/>
+    <quality shadowsize="4096" offsamples="8"/>
+    <rgba haze="0.93 0.9 0.86 1"/>
+  </visual>
+
+  <asset>
+    <texture type="skybox" builtin="gradient" rgb1="0.97 0.94 0.9" rgb2="0.82 0.78 0.74" width="256" height="1536"/>
+    <material name="floor_mat" rgba="0.74 0.69 0.63 1" reflectance="0.05"/>
+    <material name="table_mat" rgba="0.8 0.66 0.5 1" specular="0.2" shininess="0.3"/>
+    <material name="skin" rgba="0.93 0.76 0.63 1" specular="0.15" shininess="0.3"/>
+    <material name="cloth" rgba="0.36 0.47 0.6 1" specular="0.05"/>
+    <material name="cushion" rgba="0.55 0.65 0.6 1" specular="0.05"/>
+    <material name="chair" rgba="0.3 0.27 0.25 1"/>
+    <material name="hair" rgba="0.17 0.14 0.13 1"/>
+  </asset>
+
+  <default>
+    <default class="person">
+      <geom contype="0" conaffinity="0" material="skin"/>
+    </default>
+  </default>
+
+  <worldbody>
+    <light name="key" pos="0.4 -1.2 1.8" dir="0 0.5 -1" castshadow="true" diffuse="0.32 0.31 0.3"/>
+    <light name="fill" pos="0.4 1.5 1.5" dir="0 -0.5 -1" castshadow="false" diffuse="0.12 0.12 0.13"/>
+
+    <geom name="floor" type="plane" size="4 4 0.1" pos="0 0 -0.74" material="floor_mat" contype="0" conaffinity="0"/>
+    <geom name="table" type="box" size="0.54 0.5 0.02" pos="0.2 0 -0.02" material="table_mat"/>
+    <geom name="table_leg" type="box" size="0.05 0.05 0.35" pos="0.2 0 -0.39" material="chair" contype="0" conaffinity="0"/>
+    <geom name="arm_cushion" type="box" size="0.17 0.08 0.015" pos="0.5 0 0.015" material="cushion"/>
+
+    <!-- 人物 (相手役)。テーブル奥に座り、右前腕を手のひらを上にしてクッションへ載せている。
+         前腕は肘まわりのヒンジで持ち上がり、「びくっ」と腕を引く動きを再現する -->
+    <body name="forearm" pos="0.64 0 0.08">
+      <joint name="elbow" type="hinge" axis="0 1 0" range="-0.05 0.9" damping="4" armature="0.05"/>
+      <geom name="forearm_skin" type="capsule" fromto="0 0 0 -0.27 0 -0.008" size="0.04" material="skin"
+            solref="-250 -25" solimp="0.3 0.6 0.012 0.5 2" friction="0.15 0.005 0.0001" condim="3" mass="1.5"/>
+      <geom name="palm" class="person" type="ellipsoid" size="0.05 0.04 0.016" pos="-0.33 0 -0.016"/>
+      <geom class="person" type="capsule" fromto="-0.37 0.03 -0.018 -0.43 0.04 -0.02" size="0.008"/>
+      <geom class="person" type="capsule" fromto="-0.375 0.012 -0.018 -0.45 0.015 -0.02" size="0.008"/>
+      <geom class="person" type="capsule" fromto="-0.375 -0.008 -0.018 -0.445 -0.01 -0.02" size="0.008"/>
+      <geom class="person" type="capsule" fromto="-0.37 -0.028 -0.018 -0.425 -0.034 -0.02" size="0.007"/>
+      <geom class="person" type="capsule" fromto="-0.33 -0.04 -0.016 -0.385 -0.075 -0.018" size="0.009"/>
+    </body>
+
+    <body name="person">
+      <geom class="person" type="capsule" fromto="0.64 0 0.07 0.82 0.03 0.42" size="0.042" material="cloth"/>
+      <geom class="person" type="capsule" fromto="0.86 0.2 -0.12 0.86 0.2 0.42" size="0.15" material="cloth"/>
+      <geom class="person" type="capsule" fromto="0.84 0.03 0.43 0.84 0.37 0.43" size="0.055" material="cloth"/>
+      <geom class="person" type="capsule" fromto="0.86 0.2 0.46 0.86 0.2 0.56" size="0.045"/>
+      <geom class="person" type="sphere" size="0.105" pos="0.85 0.2 0.66"/>
+      <geom class="person" type="ellipsoid" size="0.11 0.112 0.09" pos="0.875 0.2 0.7" material="hair"/>
+      <geom class="person" type="sphere" size="0.009" pos="0.752 0.165 0.675" material="hair"/>
+      <geom class="person" type="sphere" size="0.009" pos="0.752 0.235 0.675" material="hair"/>
+      <geom class="person" type="capsule" fromto="0.84 0.37 0.43 0.72 0.42 0.12" size="0.042" material="cloth"/>
+      <geom class="person" type="capsule" fromto="0.72 0.42 0.12 0.55 0.32 0.1" size="0.038" material="skin"/>
+      <geom class="person" type="capsule" fromto="0.86 0.12 -0.14 0.58 0.12 -0.14" size="0.075" material="cloth"/>
+      <geom class="person" type="capsule" fromto="0.86 0.3 -0.14 0.58 0.3 -0.14" size="0.075" material="cloth"/>
+      <geom class="person" type="capsule" fromto="0.58 0.12 -0.14 0.58 0.12 -0.66" size="0.055" material="cloth"/>
+      <geom class="person" type="capsule" fromto="0.58 0.3 -0.14 0.58 0.3 -0.66" size="0.055" material="cloth"/>
+      <geom class="person" type="box" size="0.2 0.22 0.3" pos="0.98 0.2 -0.5" material="chair"/>
+      <geom class="person" type="box" size="0.03 0.22 0.42" pos="1.1 0.2 0.1" material="chair"/>
+    </body>
+
+    <camera name="side" pos="0.44 -1.75 0.42" xyaxes="1 0 0 0 0.08 1" fovy="40"/>
+    <camera name="close" pos="0.62 -0.72 0.34" xyaxes="0.986 0.164 0 -0.051 0.308 0.95" fovy="40"/>
+    <camera name="front" pos="1.05 -0.85 0.62" xyaxes="0.66 0.75 0 -0.24 0.21 0.95" fovy="45"/>
+  </worldbody>
+
+  <actuator>
+    <!-- 相手役の肘。シナリオから「腕を引く」動きを指令する -->
+    <position name="elbow_servo" joint="elbow" kp="120" kv="8" ctrlrange="-0.05 0.9"/>
+  </actuator>
+</mujoco>

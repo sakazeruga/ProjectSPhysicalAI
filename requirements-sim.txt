@@ -1,0 +1,14 @@
+-r requirements.txt
+# タッチケア シミュレーション (main.py --output mujoco)
+mujoco>=3.3
+numpy>=2.0
+# 感情推定 (main.py --input care)。torch は CPU 版で十分
+torch>=2.5
+transformers>=5.0
+fugashi>=1.3
+unidic-lite>=1.0.8
+# デモ動画・レポートの生成 (tools/make_demo_video.py, tools/make_report.py)
+imageio>=2.34
+imageio-ffmpeg>=0.5
+pillow>=10.0
+reportlab>=4.0
